@@ -4,16 +4,20 @@
 #include <cstdio>
 #include <fstream>
 #include <sstream>
+#include <csignal>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/wait.h>
 #include <pwd.h>
 #include <termios.h>
-#include <vector>
 #include <functional>
 
 static std::string homeDir;
+
+void onCtrlC(int) {
+    std::cout << "\nYou stopped it.\n";
+    exit(1);
+}
 
 std::string getHome() {
     if (!homeDir.empty()) return homeDir;
@@ -60,92 +64,11 @@ std::string readPass() {
     return pass;
 }
 
-std::string runRead(const std::string &cmd) {
-    FILE *f = popen(cmd.c_str(), "r");
-    if (!f) return "";
-    std::string out;
-    char buf[256];
-    while (fgets(buf, sizeof(buf), f)) out += buf;
-    pclose(f);
-    return out;
-}
-
-// this is the part that actually does the steamcmd dance
 int steamLogin(const std::string &user, const std::string &pass, const std::string &installDir) {
-    std::string fifoIn = "/tmp/gd_steam_in";
-    std::string fifoOut = "/tmp/gd_steam_out";
-
-    unlink(fifoIn.c_str());
-    unlink(fifoOut.c_str());
-    mkfifo(fifoIn.c_str(), 0600);
-    mkfifo(fifoOut.c_str(), 0600);
-
-    pid_t pid = fork();
-    if (pid == 0) {
-        freopen(fifoIn.c_str(), "r", stdin);
-        freopen(fifoOut.c_str(), "w", stdout);
-        dup2(fileno(stdout), fileno(stderr));
-        execlp("steamcmd", "steamcmd",
-            "+login", user.c_str(), pass.c_str(),
-            "+force_install_dir", installDir.c_str(),
-            "+app_update", "322170", "validate",
-            "+quit", nullptr);
-        exit(127);
-    }
-
-    FILE *fin = fopen(fifoIn.c_str(), "w");
-    FILE *fout = fopen(fifoOut.c_str(), "r");
-
-    std::string lineBuf;
-    char c;
-    bool done = false;
-    bool authed = false;
-
-    while (!done && fread(&c, 1, 1, fout) == 1) {
-        if (c == '\n' || c == '\r') {
-            auto &l = lineBuf;
-            if (!l.empty()) {
-                std::cout << "[steamcmd] " << l << "\n";
-                std::cout.flush();
-
-                if (l.find("Please confirm the login in the Steam Mobile app") != std::string::npos) {
-                    std::cout << ">> Check your phone and accept the login request in the Steam app.\n";
-                } else if (l.find("Steam Guard code:") != std::string::npos) {
-                    std::cout << ">> Check your email and type the Steam Guard code: ";
-                    std::string code; std::getline(std::cin, code);
-                    fprintf(fin, "%s\n", code.c_str());
-                    fflush(fin);
-                } else if (l.find("Two-factor code:") != std::string::npos) {
-                    std::cout << ">> Open your Steam mobile app and type the rotating 2FA code: ";
-                    std::string code; std::getline(std::cin, code);
-                    fprintf(fin, "%s\n", code.c_str());
-                    fflush(fin);
-                } else if (l.find("Logged in OK") != std::string::npos || l.find("Login Successful") != std::string::npos) {
-                    authed = true;
-                } else if (l.find("Loading Steam API") != std::string::npos && authed) {
-                    // yeah
-                } else if (l.find("Success! App '322170' fully installed") != std::string::npos) {
-                    done = true;
-                } else if (l.find("FAILED") != std::string::npos || l.find("Invalid Password") != std::string::npos) {
-                    std::cerr << "[ERROR] Steam login/install failed.\n";
-                    fclose(fin); fclose(fout);
-                    return 1;
-                }
-            }
-            lineBuf.clear();
-        } else {
-            lineBuf += c;
-        }
-    }
-
-    fclose(fin);
-    fclose(fout);
-    unlink(fifoIn.c_str());
-    unlink(fifoOut.c_str());
-
-    int status;
-    waitpid(pid, &status, 0);
-    return WEXITSTATUS(status);
+    std::string cmd = "steamcmd +login " + user + " " + pass +
+        " +force_install_dir \"" + installDir + "\"" +
+        " +app_update 322170 validate +quit";
+    return system(cmd.c_str());
 }
 
 void writeAliases(const std::string &wineprefix, const std::string &exePath) {
@@ -199,6 +122,8 @@ void makeDesktopEntry(const std::string &wineprefix, const std::string &exePath,
 }
 
 int main() {
+    signal(SIGINT, onCtrlC);
+
     std::cout << "=== GD Installer ===\n\n";
 
     if (!cmdExists("wine"))        die("wine not found.");
@@ -243,6 +168,7 @@ int main() {
     std::string pngPath = getHome() + "/.local/share/applications/geometrydash.png";
     std::string dlCmd = "curl -sL \"https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/apps/322170/630be2daec290610d9ec3c7ba9bbacc786996953.ico\" -o \"" + icoPath + "\"";
     system(dlCmd.c_str());
+    // what the fuck imagemagick why is this the syntax
     std::string convCmd = "magick \"" + icoPath + "\" -thumbnail 256x256 \"" + pngPath + "\"";
     system(convCmd.c_str());
 
