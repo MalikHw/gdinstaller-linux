@@ -210,11 +210,13 @@ int main() {
     std::string pass = readPass();
 
     std::cout << "\nStarting steamcmd...\n";
-    int r = steamInstall(user, pass, installDir);
-    if (r != 0) {
-        std::cerr << "[ERROR] steamcmd exited with code " << r << "\n";
+    steamInstall(user, pass, installDir);
+
+    if (access(exePath.c_str(), F_OK) != 0) {
+        std::cerr << "[ERROR] GeometryDash.exe not found after steamcmd ran, something actually went wrong.\n";
         return 1;
     }
+    std::cout << "Game files OK.\n";
 
     std::cout << "\nSetting up wine prefix...\n";
     system(("WINEPREFIX=" + wineprefix + " wineboot --init 2>&1").c_str());
