@@ -64,16 +64,79 @@ std::string readPass() {
     return pass;
 }
 
-int steamLogin(const std::string &user, const std::string &pass, const std::string &installDir) {
-    std::string cmd = "steamcmd +login " + user + " " + pass +
-        " +force_install_dir \"" + installDir + "\"" +
-        " +app_update 322170 validate +quit";
+int steamInstall(const std::string &user, const std::string &pass, const std::string &installDir) {
+    std::string cmd = "steamcmd"
+        " +force_install_dir \"" + installDir + "\""
+        " +login " + user + " " + pass +
+        " +app_update 322170 validate"
+        " +quit";
     return system(cmd.c_str());
 }
 
+std::string fetchGeodeTag() {
+    std::string tmp = "/tmp/gd_geode_ver.json";
+    std::string dlCmd = "curl -s 'https://api.geode-sdk.org/v1/loader/versions/latest?platform=win' -o " + tmp;
+    system(dlCmd.c_str());
+
+    std::string parseCmd;
+    if (system("command -v jq > /dev/null 2>&1") == 0) {
+        parseCmd = "jq -r .payload.tag " + tmp;
+    } else if (system("command -v python3 > /dev/null 2>&1") == 0) {
+        parseCmd = "python3 -c 'import json,sys;print(json.load(open(\"" + tmp + "\"))[\"payload\"][\"tag\"])'";
+    } else {
+        parseCmd = "python -c 'import json,sys;print(json.load(open(\"" + tmp + "\"))[\"payload\"][\"tag\"])'";
+    }
+
+    FILE *f = popen(parseCmd.c_str(), "r");
+    if (!f) return "";
+    char buf[128] = {};
+    fgets(buf, sizeof(buf), f);
+    pclose(f);
+
+    std::string tag = buf;
+    while (!tag.empty() && (tag.back() == '\n' || tag.back() == '\r' || tag.back() == ' '))
+        tag.pop_back();
+    return tag;
+}
+
+void installGeode(const std::string &gdPath) {
+    std::cout << "Fetching latest Geode version...\n";
+    std::string tag = fetchGeodeTag();
+    if (tag.empty()) {
+        std::cerr << "[ERROR] Could not fetch Geode version, skipping.\n";
+        return;
+    }
+    std::cout << "Downloading Geode " << tag << "...\n";
+
+    std::string zipPath = "/tmp/geode.zip";
+    std::string extractPath = "/tmp/geode_extracted";
+    std::string dlCmd = "curl -L -o " + zipPath +
+        " \"https://github.com/geode-sdk/geode/releases/download/" + tag +
+        "/geode-" + tag + "-win.zip\"";
+
+    if (system(dlCmd.c_str()) != 0) {
+        std::cerr << "[ERROR] Failed to download Geode.\n";
+        return;
+    }
+
+    std::string mkdirCmd = "mkdir -p " + extractPath;
+    system(mkdirCmd.c_str());
+
+    std::string unzipCmd = "unzip -qq \"" + zipPath + "\" -d \"" + extractPath + "\"";
+    if (system(unzipCmd.c_str()) != 0) {
+        std::cerr << "[ERROR] Failed to unzip Geode.\n";
+        return;
+    }
+
+    std::string mvCmd = "mv \"" + extractPath + "\"/* \"" + gdPath + "/\"";
+    system(mvCmd.c_str());
+    std::cout << "Geode installed.\n";
+}
+
 void writeAliases(const std::string &wineprefix, const std::string &exePath) {
-    std::string aliasLine = "alias gdash='WINEPREFIX=" + wineprefix + " wine \"" + exePath + "\"'\n";
-    aliasLine += "alias geometrydash='WINEPREFIX=" + wineprefix + " wine \"" + exePath + "\"'\n";
+    std::string aliasLine =
+        "alias gdash='WINEPREFIX=" + wineprefix + " WINEDLLOVERRIDES=\"xinput1_4=n,b\" wine \"" + exePath + "\"'\n"
+        "alias geometrydash='WINEPREFIX=" + wineprefix + " WINEDLLOVERRIDES=\"xinput1_4=n,b\" wine \"" + exePath + "\"'\n";
 
     auto appendIfMissing = [&](const std::string &file, const std::string &content) {
         std::ifstream check(file);
@@ -86,19 +149,17 @@ void writeAliases(const std::string &wineprefix, const std::string &exePath) {
         }
     };
 
-    std::string bash = getHome() + "/.bashrc";
-    std::string zsh  = getHome() + "/.zshrc";
-    appendIfMissing(bash, aliasLine);
-    appendIfMissing(zsh, aliasLine);
+    appendIfMissing(getHome() + "/.bashrc", aliasLine);
+    appendIfMissing(getHome() + "/.zshrc", aliasLine);
 
     std::string fishDir = getHome() + "/.config/fish/functions";
     mkdirp(fishDir);
 
     auto writeFishAlias = [&](const std::string &name) {
-        std::string fishFile = fishDir + "/" + name + ".fish";
-        std::ofstream f(fishFile);
+        std::ofstream f(fishDir + "/" + name + ".fish");
         f << "function " << name << "\n";
         f << "    set -x WINEPREFIX " << wineprefix << "\n";
+        f << "    set -x WINEDLLOVERRIDES \"xinput1_4=n,b\"\n";
         f << "    wine \"" << exePath << "\"\n";
         f << "end\n";
     };
@@ -110,11 +171,10 @@ void makeDesktopEntry(const std::string &wineprefix, const std::string &exePath,
     std::string appDir = getHome() + "/.local/share/applications";
     mkdirp(appDir);
 
-    std::string desktopFile = appDir + "/geometrydash.desktop";
-    std::ofstream f(desktopFile);
+    std::ofstream f(appDir + "/geometrydash.desktop");
     f << "[Desktop Entry]\n";
     f << "Name=Geometry Dash\n";
-    f << "Exec=env WINEPREFIX=" << wineprefix << " wine \"" << exePath << "\"\n";
+    f << "Exec=env WINEPREFIX=" << wineprefix << " WINEDLLOVERRIDES=\"xinput1_4=n,b\" wine \"" << exePath << "\"\n";
     f << "Icon=" << iconPath << "\n";
     f << "Type=Application\n";
     f << "Categories=Game;\n";
@@ -130,6 +190,11 @@ int main() {
     if (!cmdExists("magick"))      die("imagemagick not found.");
     if (!cmdExists("steamcmd"))    die("steamcmd not found.");
     if (!cmdExists("winetricks"))  die("winetricks not found.");
+    if (!cmdExists("unzip"))       die("unzip not found.");
+    if (!cmdExists("curl"))        die("curl not found.");
+
+    if (!cmdExists("jq") && !cmdExists("python3") && !cmdExists("python"))
+        die("jq or python is required for Geode version parsing.");
 
     std::string installDir = getHome() + "/Games/GeometryDash";
     std::string wineprefix = getHome() + "/.wine-gd";
@@ -145,32 +210,29 @@ int main() {
     std::string pass = readPass();
 
     std::cout << "\nStarting steamcmd...\n";
-    int r = steamLogin(user, pass, installDir);
+    int r = steamInstall(user, pass, installDir);
     if (r != 0) {
         std::cerr << "[ERROR] steamcmd exited with code " << r << "\n";
         return 1;
     }
 
     std::cout << "\nSetting up wine prefix...\n";
-    std::string wpCmd = "WINEPREFIX=" + wineprefix + " wineboot --init 2>&1";
-    system(wpCmd.c_str());
+    system(("WINEPREFIX=" + wineprefix + " wineboot --init 2>&1").c_str());
 
     std::cout << "Installing vcrun2015...\n";
-    std::string wt1 = "WINEPREFIX=" + wineprefix + " winetricks -q vcrun2015 2>&1";
-    system(wt1.c_str());
+    system(("WINEPREFIX=" + wineprefix + " winetricks -q vcrun2015 2>&1").c_str());
 
     std::cout << "Installing d3dcompiler_47...\n";
-    std::string wt2 = "WINEPREFIX=" + wineprefix + " winetricks -q d3dcompiler_47 2>&1";
-    system(wt2.c_str());
+    system(("WINEPREFIX=" + wineprefix + " winetricks -q d3dcompiler_47 2>&1").c_str());
+
+    installGeode(installDir);
 
     std::cout << "Downloading icon...\n";
     std::string icoPath = getHome() + "/.local/share/applications/geometrydash.ico";
     std::string pngPath = getHome() + "/.local/share/applications/geometrydash.png";
-    std::string dlCmd = "curl -sL \"https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/apps/322170/630be2daec290610d9ec3c7ba9bbacc786996953.ico\" -o \"" + icoPath + "\"";
-    system(dlCmd.c_str());
+    system(("curl -sL \"https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/apps/322170/630be2daec290610d9ec3c7ba9bbacc786996953.ico\" -o \"" + icoPath + "\"").c_str());
     // what the fuck imagemagick why is this the syntax
-    std::string convCmd = "magick \"" + icoPath + "\" -thumbnail 256x256 \"" + pngPath + "\"";
-    system(convCmd.c_str());
+    system(("magick \"" + icoPath + "\" -thumbnail 256x256 \"" + pngPath + "\"").c_str());
 
     writeAliases(wineprefix, exePath);
     makeDesktopEntry(wineprefix, exePath, pngPath);
