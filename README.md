@@ -11,7 +11,7 @@ Downloads GD via steamcmd using your Steam credentials, sets up Wine with the re
 
 ---
 
-## Dependencies
+## Dependencies (mostly handled by the script)
 
 You need to own Geometry Dash on Steam. This tool downloads the game using your account — it does not pirate anything.
 
