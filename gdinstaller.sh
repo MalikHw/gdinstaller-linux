@@ -28,19 +28,21 @@ while [[ $# -gt 0 ]]; do
         --launch-at-finish) LAUNCH_AT_FINISH=1 ;;
         --install-dir)      shift; INSTALL_DIR="$1" ;;
         --help|-h)
-            echo "gdash - Geometry Dash installer/launcher for Linux"
+            echo "gdinstaller/gdash - Geometry Dash installer/launcher for Linux"
             echo ""
             echo "Usage:"
-            echo "  gdash                     Install GD (first run), or launch it (if already installed)"
-            echo "  gdash --reinstall         Wipe and reinstall everything from scratch"
-            echo "  gdash --uninstall         Remove GD, aliases, desktop entry and all installer files"
-            echo "  gdash --install-update    Check for a GD update and apply it if available"
-            echo "  gdash --install-dir PATH  Use a custom install directory instead of ~/Games/GeometryDash"
-            echo "  gdash --launch-at-finish  Launch GD immediately after install/update finishes"
-            echo "  gdash --help              Show this message"
+            echo "  gdinstaller/gdash                     Install GD (first run), or launch it (if already installed)"
+            echo "  gdinstaller/gdash --reinstall         Wipe and reinstall everything from scratch"
+            echo "  gdinstaller/gdash --uninstall         Remove GD, aliases, desktop entry and all installer files"
+            echo "  gdinstaller/gdash --install-update    Check for a GD update and apply it if available"
+            echo "  gdinstaller/gdash --install-dir PATH  Use a custom install directory instead of ~/Games/GeometryDash"
+            echo "  gdinstaller/gdash --launch-at-finish  Launch GD immediately after install/update finishes"
+            echo "  gdinstaller/gdash --help              Show this message"
             echo ""
             echo "Logs: ~/.local/share/gdinstaller/install.log"
             echo "More info: https://github.com/MalikHw/gdinstaller-linux"
+            echo ""
+            echo "Pls consider supporting me for making ts https://malikhw.github.io/donate"
             exit 0
             ;;
         *) echo "Unknown option: $1"; exit 1 ;;
@@ -181,7 +183,7 @@ install_icon() {
     log "Downloading icon..."
     mkdir -p "$HOME/.local/share/applications"
     curl -sL "https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/apps/322170/630be2daec290610d9ec3c7ba9bbacc786996953.ico" -o "$ICO_PATH"
-    # what the fuck imagemagick why is this the syntax
+    # what the fuck imagemagick why is ts the syntax
     magick "$ICO_PATH" -thumbnail 256x256 "$PNG_PATH"
 }
 
