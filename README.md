@@ -52,14 +52,14 @@ sudo dnf install jq
 
 ## Usage
 
-Download the latest binary from [Releases](../../releases), then:
-
-```bash
-chmod +x gdinstaller
-./gdinstaller
+RUn this!
 ```
+curl -o- 'https://github.com/MalikHw/gdinstaller-linux/raw/refs/heads/main/gdinstaller.sh' | bash
+```
+or clone the repo and run the script manually
 
-It'll ask for your Steam username and password, then handle everything else automatically. Once it's done, restart your shell and run:
+
+It'll ask for your Steam username and password and some questions, then handle everything else automatically. Once it's done, restart your shell and run:
 
 ```bash
 gdash
