@@ -22,15 +22,22 @@ sudo pacman -S wine winetricks imagemagick unzip curl
 yay -S steamcmd  # or however you install AUR packages
 ```
 
-**Ubuntu / Debian**
+**Ubuntu**
 ```bash
+sudo add-apt-repository multiverse && sudo dpkg --add-architecture i386 && sudo apt update && sudo apt install wine winetricks imagemagick unzip curl steamcmd
+```
+
+**Debian**
+```
+sudo apt update; sudo apt install software-properties-common; sudo apt-add-repository non-free; sudo dpkg --add-architecture i386; sudo apt update
 sudo apt install wine winetricks imagemagick unzip curl steamcmd
 ```
 
 **Fedora**
 ```bash
-sudo dnf install wine winetricks ImageMagick unzip curl steamcmd
+sudo dnf install wine winetricks ImageMagick unzip curl
 ```
+AND you need steamcmd, look up how to install (updating this guide soon)
 
 You also need one of `jq`, `python3`, or `python` for version parsing:
 ```bash
