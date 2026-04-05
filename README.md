@@ -1,3 +1,4 @@
+(i need testers: a linux user (NO ATOMIC/NIX😭) who owns gd, please test and open an issue with results)
 # gdinstaller-linux
 
 Installs Geometry Dash on Linux without the Steam client, with Geode pre-installed and ready to go.
