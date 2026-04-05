@@ -184,7 +184,7 @@ install_icon() {
     mkdir -p "$HOME/.local/share/applications"
     curl -sL "https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/apps/322170/630be2daec290610d9ec3c7ba9bbacc786996953.ico" -o "$ICO_PATH"
     # what the fuck imagemagick why is ts the syntax
-    magick "$ICO_PATH" -thumbnail 256x256 "$PNG_PATH"
+    magick "$ICO_PATH[0]" "$PNG_PATH"
 }
 
 ask_bin_dir() {
