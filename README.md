@@ -54,7 +54,7 @@ sudo dnf install jq
 
 RUn this!
 ```
-curl -o- 'https://github.com/MalikHw/gdinstaller-linux/raw/refs/heads/main/gdinstaller.sh' | bash
+curl -sL 'https://github.com/MalikHw/gdinstaller-linux/raw/refs/heads/main/gdinstaller.sh' -o gdinstaller.sh && bash gdinstaller.sh
 ```
 or clone the repo and run the script manually
 
