@@ -70,4 +70,4 @@ After installing the game, the installer replaces `steam_api64.dll` with a stub 
 The stub is **not** a crack and does not bypass ownership — you still need to own the game and log in with your real Steam account to download it. The stub only replaces the runtime Steam connection that would otherwise block the game from starting.
 
 
-btw pwease [donate](https://malikhw.github.io/donate) i made this in houws 🥺:trollface:
+btw pwease [donate](https://malikhw.github.io/donate) i made this in houws 🥺 :trollface:
