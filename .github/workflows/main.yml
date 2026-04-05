@@ -1,9 +1,22 @@
 name: build
 
 on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag"
+        required: false
+        default: ""
+      release_notes:
+        description: "Release notes"
+        required: false
+        default: ""
   push:
-    branches: ["**"]
-  pull_request:
+    branches:
+      - "**"
+
+permissions:
+  contents: write
 
 jobs:
   build-linux:
@@ -20,3 +33,13 @@ jobs:
         with:
           name: gdinstaller-linux-x86_64
           path: gdinstaller
+
+      - name: Create tag and release
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag != '' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_tag }}
+          name: ${{ inputs.release_tag }}
+          body: ${{ inputs.release_notes }}
+          files: gdinstaller
+          generate_release_notes: false
