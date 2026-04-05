@@ -75,8 +75,7 @@ int steamInstall(const std::string &user, const std::string &pass, const std::st
 
 std::string fetchGeodeTag() {
     std::string tmp = "/tmp/gd_geode_ver.json";
-    std::string dlCmd = "curl -s 'https://api.geode-sdk.org/v1/loader/versions/latest?platform=win' -o " + tmp;
-    system(dlCmd.c_str());
+    system(("curl -s 'https://api.geode-sdk.org/v1/loader/versions/latest?platform=win' -o " + tmp).c_str());
 
     std::string parseCmd;
     if (system("command -v jq > /dev/null 2>&1") == 0) {
@@ -119,31 +118,42 @@ void installGeode(const std::string &gdPath) {
         return;
     }
 
-    std::string mkdirCmd = "mkdir -p " + extractPath;
-    system(mkdirCmd.c_str());
+    system(("mkdir -p " + extractPath).c_str());
 
-    std::string unzipCmd = "unzip -qq \"" + zipPath + "\" -d \"" + extractPath + "\"";
-    if (system(unzipCmd.c_str()) != 0) {
+    if (system(("unzip -qq \"" + zipPath + "\" -d \"" + extractPath + "\"").c_str()) != 0) {
         std::cerr << "[ERROR] Failed to unzip Geode.\n";
         return;
     }
 
-    std::string mvCmd = "mv \"" + extractPath + "\"/* \"" + gdPath + "/\"";
-    system(mvCmd.c_str());
+    system(("mv \"" + extractPath + "\"/* \"" + gdPath + "/\"").c_str());
     std::cout << "Geode installed.\n";
 }
 
-void writeAliases(const std::string &wineprefix, const std::string &exePath) {
+void installSteamStub(const std::string &gdPath) {
+    std::cout << "Downloading steam_api64 stub...\n";
+    std::string dest = gdPath + "/steam_api64.dll";
+    std::string cmd = "curl -L -o \"" + dest + "\""
+        " \"https://github.com/MalikHw/stub-for-gdinstaller/raw/main/steam_api64.dll\"";
+    if (system(cmd.c_str()) != 0) {
+        std::cerr << "[ERROR] Failed to download steam_api64 stub.\n";
+        return;
+    }
+
+    std::ofstream appid(gdPath + "/steam_appid.txt");
+    appid << "322170\n";
+    std::cout << "Steam stub installed.\n";
+}
+
+void writeAliases(const std::string &exePath) {
     std::string aliasLine =
-        "alias gdash='WINEPREFIX=" + wineprefix + " WINEDLLOVERRIDES=\"xinput1_4=n,b\" wine \"" + exePath + "\"'\n"
-        "alias geometrydash='WINEPREFIX=" + wineprefix + " WINEDLLOVERRIDES=\"xinput1_4=n,b\" wine \"" + exePath + "\"'\n";
+        "alias gdash='WINEDLLOVERRIDES=\"xinput1_4=n,b\" wine \"" + exePath + "\"'\n"
+        "alias geometrydash='WINEDLLOVERRIDES=\"xinput1_4=n,b\" wine \"" + exePath + "\"'\n";
 
     auto appendIfMissing = [&](const std::string &file, const std::string &content) {
         std::ifstream check(file);
         std::stringstream ss;
         ss << check.rdbuf();
-        std::string existing = ss.str();
-        if (existing.find("alias gdash=") == std::string::npos) {
+        if (ss.str().find("alias gdash=") == std::string::npos) {
             std::ofstream out(file, std::ios::app);
             out << "\n" << content;
         }
@@ -158,7 +168,6 @@ void writeAliases(const std::string &wineprefix, const std::string &exePath) {
     auto writeFishAlias = [&](const std::string &name) {
         std::ofstream f(fishDir + "/" + name + ".fish");
         f << "function " << name << "\n";
-        f << "    set -x WINEPREFIX " << wineprefix << "\n";
         f << "    set -x WINEDLLOVERRIDES \"xinput1_4=n,b\"\n";
         f << "    wine \"" << exePath << "\"\n";
         f << "end\n";
@@ -167,14 +176,14 @@ void writeAliases(const std::string &wineprefix, const std::string &exePath) {
     writeFishAlias("geometrydash");
 }
 
-void makeDesktopEntry(const std::string &wineprefix, const std::string &exePath, const std::string &iconPath) {
+void makeDesktopEntry(const std::string &exePath, const std::string &iconPath) {
     std::string appDir = getHome() + "/.local/share/applications";
     mkdirp(appDir);
 
     std::ofstream f(appDir + "/geometrydash.desktop");
     f << "[Desktop Entry]\n";
     f << "Name=Geometry Dash\n";
-    f << "Exec=env WINEPREFIX=" << wineprefix << " WINEDLLOVERRIDES=\"xinput1_4=n,b\" wine \"" << exePath << "\"\n";
+    f << "Exec=env WINEDLLOVERRIDES=\"xinput1_4=n,b\" wine \"" << exePath << "\"\n";
     f << "Icon=" << iconPath << "\n";
     f << "Type=Application\n";
     f << "Categories=Game;\n";
@@ -197,7 +206,6 @@ int main() {
         die("jq or python is required for Geode version parsing.");
 
     std::string installDir = getHome() + "/Games/GeometryDash";
-    std::string wineprefix = getHome() + "/.wine-gd";
     std::string exePath    = installDir + "/GeometryDash.exe";
 
     mkdirp(installDir);
@@ -218,16 +226,14 @@ int main() {
     }
     std::cout << "Game files OK.\n";
 
-    std::cout << "\nSetting up wine prefix...\n";
-    system(("WINEPREFIX=" + wineprefix + " wineboot --init 2>&1").c_str());
-
-    std::cout << "Installing vcrun2015...\n";
-    system(("WINEPREFIX=" + wineprefix + " winetricks -q vcrun2015 2>&1").c_str());
+    std::cout << "\nInstalling vcrun2015...\n";
+    system("winetricks -q vcrun2015 2>&1");
 
     std::cout << "Installing d3dcompiler_47...\n";
-    system(("WINEPREFIX=" + wineprefix + " winetricks -q d3dcompiler_47 2>&1").c_str());
+    system("winetricks -q d3dcompiler_47 2>&1");
 
     installGeode(installDir);
+    installSteamStub(installDir);
 
     std::cout << "Downloading icon...\n";
     std::string icoPath = getHome() + "/.local/share/applications/geometrydash.ico";
@@ -236,8 +242,8 @@ int main() {
     // what the fuck imagemagick why is this the syntax
     system(("magick \"" + icoPath + "\" -thumbnail 256x256 \"" + pngPath + "\"").c_str());
 
-    writeAliases(wineprefix, exePath);
-    makeDesktopEntry(wineprefix, exePath, pngPath);
+    writeAliases(exePath);
+    makeDesktopEntry(exePath, pngPath);
 
     std::cout << "\nDone! Run 'gdash' or 'geometrydash' (restart shell first), or find it in your app menu.\n";
     return 0;
